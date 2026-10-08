@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="დებატების კლუბი">
+  <rect width="64" height="64" rx="14" fill="#0E141B"/>
+  <!-- the line between the two sides -->
+  <rect x="30.4" y="12" width="3.2" height="40" rx="1.6" fill="#E8E2D2" opacity="0.18"/>
+  <!-- two cue cards, arguing -->
+  <rect x="10" y="18" width="17" height="8" rx="2" fill="#CB4B4B"/>
+  <rect x="10" y="30" width="13" height="5" rx="2" fill="#CB4B4B" opacity="0.55"/>
+  <rect x="37" y="18" width="17" height="8" rx="2" fill="#3EA39B"/>
+  <rect x="41" y="30" width="13" height="5" rx="2" fill="#3EA39B" opacity="0.55"/>
+  <!-- the lectern they speak from -->
+  <rect x="22" y="44" width="20" height="3" rx="1.5" fill="#E8E2D2" opacity="0.5"/>
+</svg>
