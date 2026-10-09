@@ -4,12 +4,15 @@
  * This is a gate, not a wall. With no backend the check can only happen in
  * the browser, so a determined student could bypass it by editing their own
  * copy of the page — what it actually protects is the shared data, which
- * lives on whatever device is signed in. Wiring Supabase (see README) moves
- * the real check server-side, where row-level security enforces it.
+ * lives on whatever device is signed in. Wiring Firebase (see README) moves
+ * the real check server-side, where the Firestore rules enforce it against
+ * a real account rather than a shared password.
  *
  * The password is stored as a SHA-256 hash so the plain text is not sitting
  * in the published bundle for anyone who opens the network tab.
  */
+
+import { isRemote, signInRemote, signOutRemote } from "./backend.js";
 
 const KEY = "debates.admin.v1";
 
@@ -43,7 +46,29 @@ export function subscribeAuth(fn) {
   return () => listeners.delete(fn);
 }
 
-export async function signIn(password) {
+/**
+ * With Firebase attached the check happens against a real account and the
+ * Firestore rules decide who may write; the login sheet then asks for an
+ * email as well. Without it, the local hash below gates the UI only.
+ */
+export const REMOTE_AUTH = isRemote;
+
+export async function signIn(password, email) {
+  if (isRemote) {
+    await signInRemote(email, password);
+    signedIn = true;
+    try {
+      localStorage.setItem(KEY, "1");
+    } catch {
+      // Session-only sign-in still works.
+    }
+    emit();
+    return;
+  }
+  return signInLocal(password);
+}
+
+async function signInLocal(password) {
   const ok = (await sha256(password)) === PASSWORD_HASH;
   if (!ok) throw new Error("პაროლი არ ემთხვევა.");
   signedIn = true;
@@ -56,6 +81,7 @@ export async function signIn(password) {
 }
 
 export function signOut() {
+  if (isRemote) signOutRemote();
   signedIn = false;
   try {
     localStorage.removeItem(KEY);

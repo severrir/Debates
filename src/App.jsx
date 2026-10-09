@@ -9,6 +9,7 @@ import TeamsView, {
   SpeakersView,
   TeamView,
 } from "./components/TeamsView.jsx";
+import EventsView from "./components/EventsView.jsx";
 import AdminView from "./components/AdminView.jsx";
 import Sheet, { Field, inputClass } from "./components/Sheet.jsx";
 import Toast from "./components/Toast.jsx";
@@ -16,7 +17,13 @@ import Watermark from "./components/Watermark.jsx";
 
 import { useStore } from "./hooks/useStore.js";
 import { useToast } from "./hooks/useToast.js";
-import { isAdmin, signIn, signOut, subscribeAuth } from "./lib/auth.js";
+import {
+  REMOTE_AUTH,
+  isAdmin,
+  signIn,
+  signOut,
+  subscribeAuth,
+} from "./lib/auth.js";
 
 /**
  * Views are addressed through the hash, so a debate or a team page can be
@@ -29,7 +36,7 @@ function readHash() {
   return { view, param };
 }
 
-const TABS = ["home", "debates", "topics", "teams", "speakers"];
+const TABS = ["home", "debates", "topics", "teams", "speakers", "events"];
 
 export default function App() {
   const state = useStore();
@@ -101,6 +108,8 @@ export default function App() {
           <TeamsView state={state} />
         ) : route.view === "speakers" ? (
           <SpeakersView state={state} />
+        ) : route.view === "events" ? (
+          <EventsView state={state} onDebate={(id) => go("debate", id)} />
         ) : (
           <HomeView state={state} onView={go} />
         )}
@@ -136,6 +145,7 @@ export default function App() {
 }
 
 function LoginSheet({ open, onClose, onDone }) {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -144,7 +154,7 @@ function LoginSheet({ open, onClose, onDone }) {
     e.preventDefault();
     setBusy(true);
     try {
-      await signIn(password);
+      await signIn(password, email);
       setPassword("");
       setError(null);
       onClose();
@@ -164,6 +174,18 @@ function LoginSheet({ open, onClose, onDone }) {
       description="შედეგების და გუნდების დამატება მხოლოდ კლუბის ხელმძღვანელს შეუძლია."
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
+        {REMOTE_AUTH && (
+          <Field label="ელფოსტა">
+            <input
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+        )}
+
         <Field label="პაროლი">
           <input
             type="password"

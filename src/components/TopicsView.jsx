@@ -4,7 +4,7 @@ import { Empty, Pill } from "./bits.jsx";
 import { Field, inputClass } from "./Sheet.jsx";
 import { CATEGORIES } from "../lib/scoring.js";
 import { addTopic, hasVoted, voteTopic } from "../lib/store.js";
-import { relativeAgo } from "../lib/georgian.js";
+import { ergative, relativeAgo } from "../lib/georgian.js";
 
 /**
  * What the club argues next is decided here.
@@ -86,7 +86,8 @@ export default function TopicsView({ state, onToast }) {
                     {t.title}
                   </span>
                   <span className="block text-meta text-bone-3">
-                    შემოთავაზა {t.author}, {relativeAgo(t.suggestedAt)}
+                    შემოთავაზა {ergative(t.author)},{" "}
+                    {relativeAgo(t.suggestedAt)}
                   </span>
                 </span>
 
@@ -125,7 +126,7 @@ function SuggestForm({ onToast }) {
   const [author, setAuthor] = useState("");
   const [error, setError] = useState(null);
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
     if (title.trim().length < 8) {
       setError("მოტივი ცოტა უფრო გასაგები დაწერე.");
@@ -135,14 +136,18 @@ function SuggestForm({ onToast }) {
       setError("სახელი აუცილებელია — ვიცოდეთ ვის მადლობა გადავუხადოთ.");
       return;
     }
-    addTopic({
-      title: title.trim(),
-      category,
-      author: author.trim(),
-    });
-    setTitle("");
-    setError(null);
-    onToast("თემა შემოთავაზებულია");
+    try {
+      await addTopic({
+        title: title.trim(),
+        category,
+        author: author.trim(),
+      });
+      setTitle("");
+      setError(null);
+      onToast("თემა შემოთავაზებულია");
+    } catch {
+      setError("ვერ გაიგზავნა. შეამოწმე ინტერნეტი და სცადე ხელახლა.");
+    }
   }
 
   return (

@@ -37,7 +37,27 @@ Standings are **never stored**. Teams and debaters are recomputed from the
 debate log every time it changes, so a mistyped result can be corrected and
 the table re-derives itself.
 
+## The screens
+
+| | |
+|---|---|
+| `#/` | next motion, champion team, top speakers, last result |
+| `#/debates` | every motion argued and scheduled, filtered by topic and format |
+| `#/topics` | categories, student suggestions, the vote on what comes next |
+| `#/teams` | the league table; `#/team/<id>` for a roster and its history |
+| `#/speakers` | the debater ranking; `#/speaker/<id>` for one speaker |
+| `#/events` | the calendar, past champions and both formats, speech by speech |
+| `#/admin` | results, debates, teams, speakers, topics, events |
+
+Each one is a hash route, so any screen can be sent to a classmate and the
+back button behaves — and GitHub Pages needs no rewrite rules.
+
 ## Attach Firebase
+
+Without credentials everything above runs on the seeded season in
+localStorage, which is what makes the site demoable the moment it opens.
+With them, the same app reads and writes Firestore, shared across every
+phone in the school.
 
 1. Firebase console → Project settings → Your apps → SDK setup → **Config**.
 2. Paste the whole config object as **one line of JSON** into `.env`:
@@ -46,33 +66,48 @@ the table re-derives itself.
    VITE_FIREBASE_CONFIG={"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}
    ```
 
-3. Add the same string as the GitHub Actions secret `VITE_FIREBASE_CONFIG`.
-4. Firestore → Rules, paste:
+3. Add the same string as the GitHub Actions secret `VITE_FIREBASE_CONFIG`
+   (Settings → Secrets and variables → Actions), or the deployed site will
+   fall back to seed data.
+4. Publish the rules in [`firestore.rules`](firestore.rules) — either paste
+   them into Firestore → Rules, or:
 
-   ```
-   rules_version = '2';
-   service cloud.firestore {
-     match /databases/{db}/documents {
-       // Anyone reads the league.
-       match /{col}/{doc} {
-         allow read: if true;
-         allow write: if request.auth != null;
-       }
-     }
-   }
+   ```bash
+   npx firebase deploy --only firestore:rules
    ```
 
 5. Authentication → Sign-in method → enable **Email/Password**, then add
-   yourself under Users.
+   the club's account under Users.
+6. Firestore → create collection `admins` → a document whose **ID is that
+   account's uid**, with any field you like (`label: "კლუბის ხელმძღვანელი"`).
 
-Collections used: `teams`, `debaters`, `debates`, `topics`, `events`.
-The seeded season stays on screen until Firestore has a real debate, so the
-site is never an empty page.
+Step 6 is the one that grants writes. An account without that row can sign
+in and will be told it may not make changes, rather than meeting a panel
+where every button fails.
+
+Collections used: `teams`, `debaters`, `debates`, `topics`, `events`,
+`champions`, `admins`. The seeded season stays on screen until Firestore
+holds something real, so the site is never an empty page.
+
+### What a student may write
+
+The rules open exactly two doors, because the site offers exactly two:
+suggesting a motion (`topics` create, with no votes of its own) and casting
+one vote (`topics.votes`, `debates.votes`, +1 and nothing else). A vote is
+an atomic increment, so two taps in the same second cannot overwrite each
+other, and one vote per device is remembered locally.
 
 ## Deploy
 
-Push to `main`. The included workflow builds and publishes to GitHub Pages;
-set **Settings → Pages → Source: GitHub Actions** once.
+Push to `main`. The included workflow builds with
+`base=/Debates/` and publishes to GitHub Pages; set **Settings → Pages →
+Source: GitHub Actions** once.
+
+```bash
+git add -A
+git commit -m "..."
+git push
+```
 
 ---
 

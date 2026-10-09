@@ -104,6 +104,20 @@ export function relativeAgo(value, now = new Date()) {
 export const daysSince = (value, now = new Date()) =>
   Math.max(0, dayDelta(now, value));
 
+/**
+ * Genitive, for "X against Y": ლოგოსი → ლოგოსის, რიტორიკა → რიტორიკის,
+ * ბაქო → ბაქოს. A final ა or ი is dropped before -ის; ე, ო and უ keep
+ * their vowel and take -ს.
+ */
+export function genitive(name) {
+  if (!name) return "";
+  const s = name.trim();
+  const last = s.slice(-1);
+  if (last === "ი" || last === "ა") return `${s.slice(0, -1)}ის`;
+  if (last === "ე" || last === "ო" || last === "უ") return `${s}ს`;
+  return `${s}ის`;
+}
+
 /** Ergative case for attribution: ნინო → ნინომ, მარიამ → მარიამმა. */
 const VOWELS = new Set(["ა", "ე", "ი", "ო", "უ"]);
 export function ergative(name) {

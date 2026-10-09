@@ -1,11 +1,24 @@
-import { Home, Lightbulb, MessagesSquare, Mic, Users } from "lucide-react";
+import {
+  CalendarDays,
+  Home,
+  Lightbulb,
+  MessagesSquare,
+  Mic,
+  Users,
+} from "lucide-react";
 
+/**
+ * Thumb-zone navigation. Six tabs is the most 360px will carry, so the
+ * labels are single words — "კალენდარი" rather than "ღონისძიებები", which
+ * cannot fit a 60px column at any readable size.
+ */
 export const TABS = [
   { id: "home", label: "მთავარი", icon: Home },
   { id: "debates", label: "დებატები", icon: MessagesSquare },
   { id: "topics", label: "თემები", icon: Lightbulb },
   { id: "teams", label: "გუნდები", icon: Users },
   { id: "speakers", label: "სპიკერები", icon: Mic },
+  { id: "events", label: "კალენდარი", icon: CalendarDays },
 ];
 
 export default function BottomNav({ view, onChange }) {

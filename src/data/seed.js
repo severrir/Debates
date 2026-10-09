@@ -252,7 +252,7 @@ export const SEED = {
     },
     {
       id: "tp-5",
-      title: "სამძებრო ისტორია ისწავლება მხოლოდ გამარჯვებულების მიერ",
+      title: "ისტორიას მხოლოდ გამარჯვებულები წერენ",
       category: "ისტორია",
       author: "გვანცა ლომიძე",
       votes: 9,
@@ -261,7 +261,7 @@ export const SEED = {
     },
     {
       id: "tp-6",
-      title: "კალათბურთში სამქულიანი ხაზი უნდა დაშორდეს",
+      title: "კალათბურთში სამქულიანი ხაზი უფრო შორს უნდა გაიწიოს",
       category: "კალათბურთი",
       author: "სალომე მჭედლიშვილი",
       votes: 6,
@@ -270,10 +270,49 @@ export const SEED = {
     },
   ],
 
+  /**
+   * The roll of honour. A season's winner is settled in a final, not by
+   * the table, so it is recorded rather than derived — the live table
+   * ranks this season, this list remembers the ones before it.
+   */
+  champions: [
+    {
+      id: "ch-1",
+      season: "2025–2026, შემოდგომა",
+      teamId: "t-logos",
+      runnerUpId: "t-antithesis",
+      bestSpeakerId: "d-mariam",
+      final: "სკოლის ბიუჯეტს მოსწავლეთა საბჭო უნდა ანაწილებდეს",
+      score: "3–2",
+      decidedAt: at(26),
+    },
+    {
+      id: "ch-2",
+      season: "2024–2025, გაზაფხული",
+      teamId: "t-antithesis",
+      runnerUpId: "t-tribuna",
+      bestSpeakerId: "d-irakli",
+      final: "ისტორიის სახელმძღვანელოს სახელმწიფო არ უნდა წერდეს",
+      score: "4–1",
+      decidedAt: at(168),
+    },
+    {
+      id: "ch-3",
+      season: "2024–2025, შემოდგომა",
+      teamId: "t-tribuna",
+      runnerUpId: "t-verdict",
+      bestSpeakerId: "d-nino",
+      final: "სკოლაში ტელეფონის გამოყენება უნდა აიკრძალოს",
+      score: "3–2",
+      decidedAt: at(288),
+    },
+  ],
+
   events: [
     {
       id: "ev-1",
       title: "დებატების საღამო — ნახევარფინალი",
+      kind: "დებატების საღამო",
       startsAt: at(-3, 15, 0),
       location: "სააქტო დარბაზი",
       note: "ორი გუნდი, სამი სპიკერი თითოში. მსაჯობს მოსწავლეთა საბჭო.",
@@ -281,6 +320,7 @@ export const SEED = {
     {
       id: "ev-2",
       title: "სკოლათაშორისი დებატები — №7 სკოლა",
+      kind: "სკოლათაშორისი მატჩი",
       startsAt: at(-17, 13, 0),
       location: "№7 საჯარო სკოლა, რუსთავი",
       note: "შერჩეული შემადგენლობა გამოცხადდება ნახევარფინალის შემდეგ.",
@@ -288,6 +328,7 @@ export const SEED = {
     {
       id: "ev-3",
       title: "სეზონის ფინალი",
+      kind: "ფინალი",
       startsAt: at(-31, 14, 0),
       location: "სააქტო დარბაზი",
       note: null,

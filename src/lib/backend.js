@@ -51,7 +51,14 @@ async function firestore() {
 }
 
 /** The collections the league is stored in, one document per record. */
-const COLLECTIONS = ["teams", "debaters", "debates", "topics", "events"];
+const COLLECTIONS = [
+  "teams",
+  "debaters",
+  "debates",
+  "topics",
+  "events",
+  "champions",
+];
 
 export async function load() {
   const ctx = await firestore();
@@ -111,17 +118,33 @@ export async function bumpField(collection, id, field, by = 1) {
  * Admin sign-in, when a backend is attached.
  * ---------------------------------------------------------------- */
 
+/**
+ * Having an account is not enough: a document in `admins` keyed by the
+ * account's uid is what grants writes, and the rules say so too. The check
+ * is repeated here only so a teacher without that row is told why, instead
+ * of meeting a panel where every button fails.
+ */
 export async function signInRemote(email, password) {
   if (!isRemote) throw new Error("ბაზა მიერთებული არ არის.");
   const { getAuth, signInWithEmailAndPassword } = await import("firebase/auth");
-  const { initializeApp, getApps } = await import("firebase/app");
-  const instance = getApps()[0] ?? initializeApp(config);
+  const auth = getAuth((await firestore()).db.app);
+
   try {
-    await signInWithEmailAndPassword(getAuth(instance), email, password);
-    return true;
+    await signInWithEmailAndPassword(auth, email, password);
   } catch {
     throw new Error("ელფოსტა ან პაროლი არ ემთხვევა.");
   }
+
+  const ctx = await firestore();
+  const row = await ctx.fs.getDoc(
+    ctx.fs.doc(ctx.db, "admins", auth.currentUser.uid),
+  );
+  if (!row.exists()) {
+    const { signOut } = await import("firebase/auth");
+    await signOut(auth);
+    throw new Error("ამ ანგარიშს ცვლილებების შეტანა არ შეუძლია.");
+  }
+  return true;
 }
 
 export async function signOutRemote() {
@@ -130,4 +153,13 @@ export async function signOutRemote() {
   const { getApps } = await import("firebase/app");
   const instance = getApps()[0];
   if (instance) await signOut(getAuth(instance));
+}
+
+/** True while a real Firebase account is signed in on this device. */
+export async function remoteUser() {
+  if (!isRemote) return null;
+  const { getAuth } = await import("firebase/auth");
+  const { getApps } = await import("firebase/app");
+  const instance = getApps()[0];
+  return instance ? (getAuth(instance).currentUser ?? null) : null;
 }

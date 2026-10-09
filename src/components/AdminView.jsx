@@ -2,14 +2,17 @@ import { useState } from "react";
 import { CalendarPlus, Gavel, Plus, RotateCcw, Trash2, UserPlus } from "lucide-react";
 import { Field, inputClass } from "./Sheet.jsx";
 import { Pill } from "./bits.jsx";
-import { CATEGORIES, FORMATS, sideName } from "../lib/scoring.js";
+import { CATEGORIES, FORMATS, sideName, speakersIn } from "../lib/scoring.js";
 import {
   addDebate,
   addDebater,
+  addEvent,
   addTeam,
   addTopic,
+  isRemote,
   removeDebate,
   removeDebater,
+  removeEvent,
   removeTeam,
   removeTopic,
   resetAll,
@@ -43,15 +46,22 @@ export default function AdminView({ state, onToast }) {
         <Pill active={tab === "debate"} onClick={() => setTab("debate")}>დებატი</Pill>
         <Pill active={tab === "team"} onClick={() => setTab("team")}>გუნდი</Pill>
         <Pill active={tab === "topic"} onClick={() => setTab("topic")}>თემა</Pill>
+        <Pill active={tab === "event"} onClick={() => setTab("event")}>ღონისძიება</Pill>
       </div>
 
       {tab === "result" && <ResultForm state={state} onToast={onToast} />}
       {tab === "debate" && <DebateForm state={state} onToast={onToast} />}
       {tab === "team" && <TeamForm state={state} onToast={onToast} />}
       {tab === "topic" && <TopicForm state={state} onToast={onToast} />}
+      {tab === "event" && <EventForm state={state} onToast={onToast} />}
 
       <section className="mt-2 border-t border-rule pt-4">
         <h2 className="font-serif text-base text-bone-2">საშიში ზონა</h2>
+        <p className="measure mt-1 text-meta text-bone-3">
+          {isRemote
+            ? "ბაზას არ ეხება — მხოლოდ ამ ტელეფონის ასლს აბრუნებს საწყის მდგომარეობაში."
+            : "ყველა შეტანილი შედეგი ამ ტელეფონიდან წაიშლება."}
+        </p>
         <button
           type="button"
           onClick={() => {
@@ -85,20 +95,24 @@ function ResultForm({ state, onToast }) {
         .filter(Boolean)
     : [];
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
     if (!debate) {
       setError("აირჩიე დებატი.");
       return;
     }
-    updateDebate(debate.id, {
-      status: "finished",
-      winner,
-      score: score.trim() || null,
-      bestSpeakerId: bestSpeakerId || null,
-    });
-    setError(null);
-    onToast("შედეგი ჩაიწერა, ცხრილი განახლდა");
+    try {
+      await updateDebate(debate.id, {
+        status: "finished",
+        winner,
+        score: score.trim() || null,
+        bestSpeakerId: bestSpeakerId || null,
+      });
+      setError(null);
+      onToast("შედეგი ჩაიწერა, ცხრილი განახლდა");
+    } catch {
+      setError(WRITE_FAILED);
+    }
   }
 
   if (open.length === 0) {
@@ -178,11 +192,11 @@ function DebateForm({ state, onToast }) {
   const [location, setLocation] = useState("სააქტო დარბაზი");
   const [error, setError] = useState(null);
 
-  const take = format === "1v1" ? 1 : 3;
+  // The format decides how many of a team's roster actually speak.
   const membersOf = (id) =>
-    (state.teamsById[id]?.memberIds ?? []).slice(0, take);
+    (state.teamsById[id]?.memberIds ?? []).slice(0, speakersIn(format));
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
     if (topic.trim().length < 8) { setError("მოტივი აუცილებელია."); return; }
     if (!forTeam || !againstTeam || forTeam === againstTeam) {
@@ -191,18 +205,22 @@ function DebateForm({ state, onToast }) {
     const at = fromLocalInputValue(heldAt);
     if (!at || Number.isNaN(at.getTime())) { setError("თარიღი არასწორია."); return; }
 
-    addDebate({
-      topic: topic.trim(),
-      category,
-      format,
-      heldAt: at.toISOString(),
-      location: location.trim() || "სკოლა",
-      for: { teamId: forTeam, speakerIds: membersOf(forTeam) },
-      against: { teamId: againstTeam, speakerIds: membersOf(againstTeam) },
-    });
-    setTopic("");
-    setError(null);
-    onToast("დებატი დაემატა");
+    try {
+      await addDebate({
+        topic: topic.trim(),
+        category,
+        format,
+        heldAt: at.toISOString(),
+        location: location.trim() || "სკოლა",
+        for: { teamId: forTeam, speakerIds: membersOf(forTeam) },
+        against: { teamId: againstTeam, speakerIds: membersOf(againstTeam) },
+      });
+      setTopic("");
+      setError(null);
+      onToast("დებატი დაემატა");
+    } catch {
+      setError(WRITE_FAILED);
+    }
   }
 
   return (
@@ -246,7 +264,7 @@ function DebateForm({ state, onToast }) {
         id: d.id,
         main: d.topic,
         meta: `${formatDate(d.heldAt, { short: true })}, ${d.status === "finished" ? "ჩატარდა" : "მომავალი"}`,
-        onRemove: () => { removeDebate(d.id); onToast("დებატი წაიშალა"); },
+        onRemove: () => remove(removeDebate(d.id), "დებატი წაიშალა", onToast),
       }))} />
     </form>
   );
@@ -265,12 +283,20 @@ function TeamForm({ state, onToast }) {
   return (
     <div className="flex flex-col gap-6">
       <form
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           if (name.trim().length < 2) { setError("გუნდის სახელი აუცილებელია."); return; }
-          addTeam({ name: name.trim(), klass: klass.trim() || "—", motto: motto.trim() || null });
-          setName(""); setKlass(""); setMotto(""); setError(null);
-          onToast("გუნდი დაემატა");
+          try {
+            await addTeam({
+              name: name.trim(),
+              klass: klass.trim() || "—",
+              motto: motto.trim() || null,
+            });
+            setName(""); setKlass(""); setMotto(""); setError(null);
+            onToast("გუნდი დაემატა");
+          } catch {
+            setError(WRITE_FAILED);
+          }
         }}
         className="flex flex-col gap-4"
       >
@@ -290,12 +316,20 @@ function TeamForm({ state, onToast }) {
       </form>
 
       <form
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           if (dName.trim().length < 2) { onToast("სპიკერის სახელი აუცილებელია", { tone: "error" }); return; }
-          addDebater({ name: dName.trim(), teamId: dTeam, klass: state.teamsById[dTeam]?.klass ?? "—" });
-          setDName("");
-          onToast("სპიკერი დაემატა");
+          try {
+            await addDebater({
+              name: dName.trim(),
+              teamId: dTeam,
+              klass: state.teamsById[dTeam]?.klass ?? "—",
+            });
+            setDName("");
+            onToast("სპიკერი დაემატა");
+          } catch {
+            onToast(WRITE_FAILED, { tone: "error" });
+          }
         }}
         className="flex flex-col gap-4 border-t border-rule pt-5"
       >
@@ -314,13 +348,13 @@ function TeamForm({ state, onToast }) {
 
       <Recent title="გუნდები" items={state.teams.map((t) => ({
         id: t.id, main: t.name, meta: `${t.klass}, ${t.points} ქულა`,
-        onRemove: () => { removeTeam(t.id); onToast("გუნდი წაიშალა"); },
+        onRemove: () => remove(removeTeam(t.id), "გუნდი წაიშალა", onToast),
       }))} />
 
       <Recent title="სპიკერები" items={state.debaters.map((d) => ({
         id: d.id, main: d.name,
         meta: `${state.teamsById[d.teamId]?.name ?? "—"}, ${d.points} ქულა`,
-        onRemove: () => { removeDebater(d.id); onToast("სპიკერი წაიშალა"); },
+        onRemove: () => remove(removeDebater(d.id), "სპიკერი წაიშალა", onToast),
       }))} />
     </div>
   );
@@ -332,12 +366,16 @@ function TopicForm({ state, onToast }) {
 
   return (
     <form
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
         if (title.trim().length < 8) { onToast("მოტივი აუცილებელია", { tone: "error" }); return; }
-        addTopic({ title: title.trim(), category, author: "ადმინისტრაცია" });
-        setTitle("");
-        onToast("თემა დაემატა");
+        try {
+          await addTopic({ title: title.trim(), category, author: "ადმინისტრაცია" });
+          setTitle("");
+          onToast("თემა დაემატა");
+        } catch {
+          onToast(WRITE_FAILED, { tone: "error" });
+        }
       }}
       className="flex flex-col gap-4"
     >
@@ -354,13 +392,99 @@ function TopicForm({ state, onToast }) {
 
       <Recent title="თემები" items={state.topics.map((t) => ({
         id: t.id, main: t.title, meta: `${t.category}, ${t.votes} ხმა`,
-        onRemove: () => { removeTopic(t.id); onToast("თემა წაიშალა"); },
+        onRemove: () => remove(removeTopic(t.id), "თემა წაიშალა", onToast),
+      }))} />
+    </form>
+  );
+}
+
+/* ---- Debate days, finals and school matches ---- */
+
+function EventForm({ state, onToast }) {
+  const [title, setTitle] = useState("");
+  const [kind, setKind] = useState("დებატების საღამო");
+  const [location, setLocation] = useState("სააქტო დარბაზი");
+  const [note, setNote] = useState("");
+  const [startsAt, setStartsAt] = useState(toLocalInputValue(new Date()));
+  const [error, setError] = useState(null);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (title.trim().length < 2) { setError("დასახელება აუცილებელია."); return; }
+    const at = fromLocalInputValue(startsAt);
+    if (!at || Number.isNaN(at.getTime())) { setError("თარიღი არასწორია."); return; }
+
+    try {
+      await addEvent({
+        title: title.trim(),
+        kind,
+        location: location.trim() || "სკოლა",
+        note: note.trim() || null,
+        startsAt: at.toISOString(),
+      });
+      setTitle("");
+      setNote("");
+      setError(null);
+      onToast("ღონისძიება დაემატა");
+    } catch {
+      setError(WRITE_FAILED);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <Field label="დასახელება">
+        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+          placeholder="დებატების საღამო — ნახევარფინალი" maxLength={80} className={inputClass} />
+      </Field>
+
+      <Field label="ტიპი">
+        <select value={kind} onChange={(e) => setKind(e.target.value)} className={inputClass}>
+          {["დებატების საღამო", "ფინალი", "სკოლათაშორისი მატჩი", "ვარჯიში", "შერჩევა"].map((k) => (
+            <option key={k} value={k} className="bg-hall-700">{k}</option>
+          ))}
+        </select>
+      </Field>
+
+      <Field label="ადგილი">
+        <input type="text" value={location} onChange={(e) => setLocation(e.target.value)}
+          maxLength={60} className={inputClass} />
+      </Field>
+
+      <Field label="როდის">
+        <input type="datetime-local" value={startsAt}
+          onChange={(e) => setStartsAt(e.target.value)} className={inputClass} />
+      </Field>
+
+      <Field label="შენიშვნა" optional>
+        <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)}
+          placeholder="ფორმატი, ვინ მსაჯობს, ვის შეუძლია დასწრება…"
+          maxLength={300} className={`${inputClass} resize-y py-2.5`} />
+      </Field>
+
+      {error && <p role="alert" className="text-sm text-for-soft">{error}</p>}
+      <Submit icon={CalendarPlus}>ღონისძიების დამატება</Submit>
+
+      <Recent title="ღონისძიებები" items={state.events.map((e) => ({
+        id: e.id, main: e.title,
+        meta: `${formatDate(e.startsAt, { short: true })}, ${e.location ?? "სკოლა"}`,
+        onRemove: () => remove(removeEvent(e.id), "ღონისძიება წაიშალა", onToast),
       }))} />
     </form>
   );
 }
 
 /* ---- Shared ---- */
+
+/** One sentence for every refused write: a rule, a role or the network. */
+const WRITE_FAILED = "ვერ შევინახე. შეამოწმე კავშირი და უფლებები.";
+
+/** Deletes report the same way wherever they are triggered from. */
+function remove(promise, done, onToast) {
+  Promise.resolve(promise)
+    .then(() => onToast(done))
+    .catch(() => onToast("ვერ წავშალე", { tone: "error" }));
+}
 
 function Submit({ icon: Icon, children }) {
   return (

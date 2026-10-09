@@ -1,0 +1,91 @@
+rules_version = '2';
+
+/**
+ * Who may write what.
+ *
+ * Anyone in the school reads everything — the site is public. Beyond that
+ * there are exactly two openings, and they are the two the site actually
+ * offers a student: suggesting a motion, and casting one vote. Everything
+ * else needs a document in `admins` keyed by the account's uid, so having
+ * a Firebase account is not enough on its own.
+ *
+ * Deploy with:  firebase deploy --only firestore:rules
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    /** Only the named top-level fields differ from the stored document. */
+    function touches(fields) {
+      return request.resource.data.diff(resource.data)
+        .affectedKeys().hasOnly(fields);
+    }
+
+    /* The admin roll. A signed-in teacher may check their own row — that
+       is how the login sheet explains a refusal — and nothing more. */
+    match /admins/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list, write: if false;
+    }
+
+    match /teams/{id}     { allow read: if true; allow write: if isAdmin(); }
+    match /debaters/{id}  { allow read: if true; allow write: if isAdmin(); }
+    match /events/{id}    { allow read: if true; allow write: if isAdmin(); }
+    match /champions/{id} { allow read: if true; allow write: if isAdmin(); }
+
+    /* A debate: the club schedules it and records the result; the audience
+       may only move the two vote counters, and only by one. */
+    match /debates/{id} {
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      /* `for` is indexed rather than dotted: it reads as a word, not a
+         field, in a rules file. */
+      allow update: if isAdmin() || (
+        touches(['votes'])
+        && request.resource.data.votes['for'] is int
+        && request.resource.data.votes['against'] is int
+        && request.resource.data.votes['for'] >= resource.data.votes['for']
+        && request.resource.data.votes['against']
+           >= resource.data.votes['against']
+        && request.resource.data.votes['for']
+           + request.resource.data.votes['against']
+           == resource.data.votes['for'] + resource.data.votes['against'] + 1
+      );
+    }
+
+    /* A motion suggested by a student arrives with no votes and no status
+       of its own; the club promotes it. Voting adds exactly one. */
+    match /topics/{id} {
+      allow read: if true;
+      allow delete: if isAdmin();
+
+      allow create: if isAdmin() || (
+        request.resource.data.keys().hasOnly(
+          ['title', 'category', 'author', 'votes', 'status', 'suggestedAt'])
+        && request.resource.data.votes == 0
+        && request.resource.data.status == 'suggested'
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 8
+        && request.resource.data.title.size() <= 160
+        && request.resource.data.author is string
+        && request.resource.data.author.size() >= 2
+        && request.resource.data.author.size() <= 60
+        && request.resource.data.category is string
+      );
+
+      allow update: if isAdmin() || (
+        touches(['votes'])
+        && request.resource.data.votes == resource.data.votes + 1
+      );
+    }
+
+    /* Anything not named above is closed. */
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

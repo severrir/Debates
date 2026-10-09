@@ -19,6 +19,20 @@ export const isRemote = backend.isRemote;
 
 const KEY = "debates.league.v1";
 
+/**
+ * The shape every reader can count on, whatever the backend answers with.
+ * A Firestore project with no `events` collection yet must not make the
+ * calendar crash on `undefined.map`.
+ */
+const EMPTY = {
+  teams: [],
+  debaters: [],
+  debates: [],
+  topics: [],
+  events: [],
+  champions: [],
+};
+
 let state = null;
 let snapshot = null;
 const listeners = new Set();
@@ -158,6 +172,13 @@ export function derive(raw) {
     ),
     debatesById: Object.fromEntries(raw.debates.map((d) => [d.id, d])),
     topics,
+    // The calendar reads forwards; the roll of honour reads backwards.
+    events: [...raw.events].sort(
+      (a, b) => new Date(a.startsAt) - new Date(b.startsAt),
+    ),
+    champions: [...(raw.champions ?? [])].sort(
+      (a, b) => new Date(b.decidedAt) - new Date(a.decidedAt),
+    ),
     champion: teamTable[0] ?? null,
   };
 }
@@ -181,8 +202,15 @@ export function hydrate() {
   const pull = async () => {
     try {
       const remote = await backend.load();
-      if (remote && (remote.debates?.length ?? 0) > 0) {
-        state = remote;
+      // An empty project would blank the league. Keep the seeded season on
+      // screen until the database holds something real — but accept it as
+      // soon as *any* collection does, so the very first team an admin
+      // enters appears instead of vanishing behind the seed.
+      const any = remote
+        ? Object.values(remote).some((rows) => (rows?.length ?? 0) > 0)
+        : false;
+      if (any) {
+        state = { ...structuredClone(EMPTY), ...remote };
         persist();
         emit();
       }
@@ -230,64 +258,79 @@ function mutate(fn) {
   emit();
 }
 
+/**
+ * Every write takes the same two roads. With a Firestore project attached
+ * it goes to the database and the snapshot listener brings it back to
+ * every phone in the hall; without one it stays in this browser. The
+ * callers only ever `await` and catch — they never ask which road it took.
+ */
+async function create(collection, doc) {
+  if (backend.isRemote) {
+    await backend.putDoc(collection, null, doc);
+    return;
+  }
+  mutate((s) => {
+    s[collection].push({ id: id(), ...doc });
+  });
+}
+
+async function patch(collection, docId, fields) {
+  if (backend.isRemote) {
+    await backend.putDoc(collection, docId, fields);
+    return;
+  }
+  mutate((s) => {
+    const row = s[collection].find((x) => x.id === docId);
+    if (row) Object.assign(row, fields);
+  });
+}
+
+async function drop(collection, docId) {
+  if (backend.isRemote) {
+    await backend.deleteDoc(collection, docId);
+    return;
+  }
+  mutate((s) => {
+    s[collection] = s[collection].filter((x) => x.id !== docId);
+  });
+}
+
 export const addDebate = (debate) =>
-  mutate((s) => {
-    s.debates.push({
-      id: id(),
-      votes: { for: 0, against: 0 },
-      status: "upcoming",
-      winner: null,
-      bestSpeakerId: null,
-      ...debate,
-    });
+  create("debates", {
+    votes: { for: 0, against: 0 },
+    status: "upcoming",
+    winner: null,
+    score: null,
+    bestSpeakerId: null,
+    ...debate,
   });
 
-export const updateDebate = (debateId, patch) =>
-  mutate((s) => {
-    const d = s.debates.find((x) => x.id === debateId);
-    if (d) Object.assign(d, patch);
-  });
+export const updateDebate = (debateId, fields) =>
+  patch("debates", debateId, fields);
 
-export const removeDebate = (debateId) =>
-  mutate((s) => {
-    s.debates = s.debates.filter((d) => d.id !== debateId);
-  });
+export const removeDebate = (debateId) => drop("debates", debateId);
 
-export const addTeam = (team) =>
-  mutate((s) => {
-    s.teams.push({ id: id(), memberIds: [], ...team });
-  });
+export const addTeam = (team) => create("teams", { motto: null, ...team });
 
-export const removeTeam = (teamId) =>
-  mutate((s) => {
-    s.teams = s.teams.filter((t) => t.id !== teamId);
-  });
+export const removeTeam = (teamId) => drop("teams", teamId);
 
-export const addDebater = (debater) =>
-  mutate((s) => {
-    s.debaters.push({ id: id(), ...debater });
-  });
+export const addDebater = (debater) => create("debaters", debater);
 
-export const removeDebater = (debaterId) =>
-  mutate((s) => {
-    s.debaters = s.debaters.filter((d) => d.id !== debaterId);
-  });
+export const removeDebater = (debaterId) => drop("debaters", debaterId);
 
 export const addTopic = (topic) =>
-  mutate((s) => {
-    s.topics.push({
-      id: id(),
-      votes: 0,
-      status: "suggested",
-      suggestedAt: new Date().toISOString(),
-      ...topic,
-    });
+  create("topics", {
+    votes: 0,
+    status: "suggested",
+    suggestedAt: new Date().toISOString(),
+    ...topic,
   });
 
-export const removeTopic = (topicId) =>
-  mutate((s) => {
-    s.topics = s.topics.filter((t) => t.id !== topicId);
-  });
+export const removeTopic = (topicId) => drop("topics", topicId);
+
+export const addEvent = (event) => create("events", { note: null, ...event });
+
+export const removeEvent = (eventId) => drop("events", eventId);
 
 /* ---------------------------------------------------------------- *
  * One vote per device, for topics and for the audience vote.
@@ -318,6 +361,13 @@ function rememberVote(key) {
 
 export const hasVoted = (key) => votedSet().has(key);
 
+/**
+ * A vote has to land on the bar the moment the thumb leaves it, so the
+ * local count moves first and the database is told afterwards. Remotely it
+ * is an increment rather than a read-then-write, so two taps in the same
+ * second cannot overwrite each other; the snapshot that follows replaces
+ * the optimistic number with the true one.
+ */
 export function voteTopic(topicId) {
   if (hasVoted(`topic:${topicId}`)) return false;
   mutate((s) => {
@@ -325,6 +375,11 @@ export function voteTopic(topicId) {
     if (t) t.votes = (t.votes ?? 0) + 1;
   });
   rememberVote(`topic:${topicId}`);
+  if (backend.isRemote) {
+    backend
+      .bumpField("topics", topicId, "votes")
+      .catch((err) => console.error("[დებატები] ხმა ვერ ჩაიწერა", err));
+  }
   return true;
 }
 
@@ -337,6 +392,11 @@ export function voteAudience(debateId, side) {
     d.votes[side] = (d.votes[side] ?? 0) + 1;
   });
   rememberVote(`debate:${debateId}`);
+  if (backend.isRemote) {
+    backend
+      .bumpField("debates", debateId, `votes.${side}`)
+      .catch((err) => console.error("[დებატები] ხმა ვერ ჩაიწერა", err));
+  }
   return true;
 }
 
