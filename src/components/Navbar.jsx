@@ -1,6 +1,6 @@
-import { Lock, LogOut, Scale } from "lucide-react";
+import { Download, Lock, LogOut, Scale } from "lucide-react";
 
-export default function Navbar({ admin, onAdmin, onSignOut }) {
+export default function Navbar({ admin, onAdmin, onSignOut, onNotebook }) {
   return (
     <header className="sticky top-0 z-30 border-b border-rule bg-hall-900/92 backdrop-blur-md">
       <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-2.5">
@@ -14,6 +14,13 @@ export default function Navbar({ admin, onAdmin, onSignOut }) {
             <span className="hidden sm:inline">რუსთავის №4 საჯარო სკოლა</span>
           </p>
         </div>
+        {/* The league on paper: one file, works with the Wi-Fi off. */}
+        <button type="button" onClick={onNotebook} aria-label="რვეულის ჩამოტვირთვა"
+          className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-hall-600 px-3 text-sm text-bone-2 transition-colors hover:bg-hall-700 hover:text-bone">
+          <Download size={16} strokeWidth={1.75} />
+          <span className="hidden sm:inline">რვეული</span>
+        </button>
+
         {admin ? (
           <button type="button" onClick={onSignOut} aria-label="გასვლა"
             className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-hall-600 px-3 text-sm text-bone-2 transition-colors hover:bg-hall-700 hover:text-bone">

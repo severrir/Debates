@@ -52,6 +52,20 @@ the table re-derives itself.
 Each one is a hash route, so any screen can be sent to a classmate and the
 back button behaves — and GitHub Pages needs no rewrite rules.
 
+## The notebook you can download
+
+The **რვეული** button in the header writes the whole league to a single
+self-contained HTML file — `debates-rveuli-2026-10-09.html` — and hands it
+to the browser. No network, no build, no app: it opens on any phone, works
+with the Wi-Fi off, and prints onto A4.
+
+That last part is the point. The person who most needs the formats and the
+points rule is the student judging at the front of the hall, and they are
+holding paper. Inside: the champion, the league table, the speaker
+ranking, every motion with its result and audience split, the topics, the
+roll of honour, the calendar, and both formats written out speech by
+speech — with a contents page, because it is a notebook.
+
 ## Attach Firebase
 
 Without credentials everything above runs on the seeded season in
