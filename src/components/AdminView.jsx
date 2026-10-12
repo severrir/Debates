@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CalendarPlus, Gavel, Plus, RotateCcw, Trash2, UserPlus } from "lucide-react";
 import { Field, inputClass } from "./Sheet.jsx";
 import { Pill } from "./bits.jsx";
+import JoinRequests from "./JoinRequests.jsx";
 import { CATEGORIES, FORMATS, sideName, speakersIn } from "../lib/scoring.js";
 import {
   addDebate,
@@ -47,6 +48,7 @@ export default function AdminView({ state, onToast }) {
         <Pill active={tab === "team"} onClick={() => setTab("team")}>გუნდი</Pill>
         <Pill active={tab === "topic"} onClick={() => setTab("topic")}>თემა</Pill>
         <Pill active={tab === "event"} onClick={() => setTab("event")}>ღონისძიება</Pill>
+        <Pill active={tab === "join"} onClick={() => setTab("join")}>განაცხადები</Pill>
       </div>
 
       {tab === "result" && <ResultForm state={state} onToast={onToast} />}
@@ -54,6 +56,7 @@ export default function AdminView({ state, onToast }) {
       {tab === "team" && <TeamForm state={state} onToast={onToast} />}
       {tab === "topic" && <TopicForm state={state} onToast={onToast} />}
       {tab === "event" && <EventForm state={state} onToast={onToast} />}
+      {tab === "join" && <JoinRequests onToast={onToast} />}
 
       <section className="mt-2 border-t border-rule pt-4">
         <h2 className="font-serif text-base text-bone-2">საშიში ზონა</h2>

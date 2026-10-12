@@ -83,6 +83,42 @@ service cloud.firestore {
       );
     }
 
+    /* A join request.
+       
+       Anyone may file one, because a student who had to register before
+       they could ask to join would not ask. Nobody but an admin may read
+       them: an application is a minor's full name next to their class, and
+       the whole collection would otherwise be a roster of children
+       readable by anyone holding the web API key — which ships in the
+       bundle by design.
+       
+       `status` is fixed at 'pending' on create, so an applicant cannot
+       file themselves as already approved. Only an admin may move it. */
+    match /applications/{id} {
+      allow get, list: if isAdmin();
+      allow update, delete: if isAdmin();
+
+      allow create: if isAdmin() || (
+        request.resource.data.keys().hasOnly(
+          ['firstName', 'lastName', 'klass', 'note', 'status', 'createdAt'])
+        && request.resource.data.status == 'pending'
+        && request.resource.data.firstName is string
+        && request.resource.data.firstName.size() >= 2
+        && request.resource.data.firstName.size() <= 40
+        && request.resource.data.lastName is string
+        && request.resource.data.lastName.size() >= 2
+        && request.resource.data.lastName.size() <= 40
+        && request.resource.data.klass is string
+        && request.resource.data.klass.size() >= 1
+        && request.resource.data.klass.size() <= 10
+        && request.resource.data.createdAt is string
+        && (!request.resource.data.keys().hasAny(['note'])
+            || request.resource.data.note == null
+            || (request.resource.data.note is string
+                && request.resource.data.note.size() <= 300))
+      );
+    }
+
     /* Anything not named above is closed. */
     match /{document=**} {
       allow read, write: if false;

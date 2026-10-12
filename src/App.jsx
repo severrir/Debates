@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { UserPlus } from "lucide-react";
 import Navbar from "./components/Navbar.jsx";
 import BottomNav from "./components/BottomNav.jsx";
 import HomeView from "./components/HomeView.jsx";
@@ -11,6 +12,7 @@ import TeamsView, {
 } from "./components/TeamsView.jsx";
 import EventsView from "./components/EventsView.jsx";
 import AdminView from "./components/AdminView.jsx";
+import JoinSheet from "./components/JoinSheet.jsx";
 import Sheet, { Field, inputClass } from "./components/Sheet.jsx";
 import Toast from "./components/Toast.jsx";
 import Watermark from "./components/Watermark.jsx";
@@ -46,6 +48,7 @@ export default function App() {
 
   const [route, setRoute] = useState(readHash);
   const [loginOpen, setLoginOpen] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
 
   useEffect(() => {
     const onHash = () => setRoute(readHash());
@@ -133,10 +136,32 @@ export default function App() {
             </button>
           </div>
         )}
+
+        {/* The way in, for everyone not already running the club. It sits
+            at the foot of every view rather than behind a tab of its own:
+            joining is something you do once, and a permanent tab for it
+            would outlive its usefulness the moment you were in. */}
+        {!admin && (
+          <div className="px-4 pt-8">
+            <button
+              type="button"
+              onClick={() => setJoinOpen(true)}
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg border border-gavel/50 bg-gavel/10 text-base font-semibold text-gavel-soft transition-colors hover:bg-gavel/20"
+            >
+              <UserPlus size={17} strokeWidth={2} />
+              კლუბში გაწევრიანება
+            </button>
+            <p className="mt-2 text-center text-meta text-bone-3">
+              სახელი, გვარი და კლასი — კლუბი განიხილავს.
+            </p>
+          </div>
+        )}
         <Watermark />
       </main>
 
       <BottomNav view={tab ?? "home"} onChange={(v) => go(v)} />
+
+      <JoinSheet open={joinOpen} onClose={() => setJoinOpen(false)} />
 
       <LoginSheet
         open={loginOpen}

@@ -99,6 +99,44 @@ export async function putDoc(collection, id, data) {
   return ref.id;
 }
 
+/**
+ * Read one collection on demand.
+ *
+ * `load()` deliberately does not include `applications`: the rules let
+ * only an admin read them, so pulling it for every visitor would mean a
+ * permission error on the front page. The admin panel asks for it here
+ * instead, when there is someone signed in to ask.
+ */
+export async function listCollection(name) {
+  const ctx = await firestore();
+  if (!ctx) return [];
+  const snap = await ctx.fs.getDocs(ctx.fs.collection(ctx.db, name));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+/**
+ * Approving an application has to add the debater *and* mark the request
+ * decided, and a half-done approval is the one outcome worth engineering
+ * against: a debater with a still-pending request invites a second
+ * approval and a duplicate roster row. A batch makes both writes land or
+ * neither.
+ */
+export async function approveApplication(applicationId, debater) {
+  const ctx = await firestore();
+  if (!ctx) return null;
+
+  const batch = ctx.fs.writeBatch(ctx.db);
+  const debaterRef = ctx.fs.doc(ctx.fs.collection(ctx.db, "debaters"));
+  batch.set(debaterRef, debater);
+  batch.update(ctx.fs.doc(ctx.db, "applications", applicationId), {
+    status: "approved",
+    decidedAt: new Date().toISOString(),
+    debaterId: debaterRef.id,
+  });
+  await batch.commit();
+  return debaterRef.id;
+}
+
 export async function deleteDoc(collection, id) {
   const ctx = await firestore();
   if (!ctx) return;

@@ -66,6 +66,50 @@ ranking, every motion with its result and audience split, the topics, the
 roll of honour, the calendar, and both formats written out speech by
 speech — with a contents page, because it is a notebook.
 
+## Joining the club
+
+At the foot of every screen there is **კლუბში გაწევრიანება**. A student
+fills in სახელი, გვარი and კლასი — no account, no password — and the
+request lands in a queue only an admin sees, under
+**ადმინისტრირება → განაცხადები**.
+
+Approving adds the debater **with no team**: which team someone debates
+for is the club's decision, made in the გუნდი tab, not something an
+applicant picks for themselves. They start on zero points, as every
+debater does.
+
+The approval is a single batched write — the debater is created and the
+request marked decided together, or neither happens. A half-done approval
+is the one outcome worth engineering against: a debater whose request
+still looked pending would invite a second approval and a duplicate roster
+row.
+
+Neither crimson nor teal appears on the approve and reject buttons. In this
+app those two colours mean "for" and "against" a motion and nothing else,
+and an approval is not an argument.
+
+### Why applications are unreadable
+
+An application is a minor's full name next to their class, so
+`applications` is readable by admins only — the whole collection would
+otherwise be a roster of children readable by anyone holding the web API
+key, which ships in the bundle by design.
+
+The rule in [`firestore.rules`](firestore.rules) allows anyone to
+`create` one, because a student who had to register before they could ask
+to join would not ask, and it pins `status` to `'pending'` on create so an
+applicant cannot file themselves as already approved. `get`, `list`,
+`update` and `delete` all require an `admins` document.
+
+`applications` is deliberately **not** in the `COLLECTIONS` list that
+`load()` pulls, because that runs for every visitor and would meet a
+permission error on the front page. The admin panel asks for it separately,
+when there is someone signed in to ask.
+
+> **The rules must be redeployed for this to work.** Until then
+> `applications` falls through to the catch-all `allow read, write: if
+> false`, and a student's application is denied. See step 4 below.
+
 ## Attach Firebase
 
 Without credentials everything above runs on the seeded season in
